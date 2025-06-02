@@ -1,0 +1,8 @@
+#! /bin/bash
+# Define MQTT broker parameters
+# Définir les paramètres du broker MQTT
+BROKER="mqtt.iut-blagnac.fr" # The MQTT broker address / L'adresse du broker MQTT
+USER=""             # Blank username for broker authentication / Nom d'utilisateur vierge pour l'authentification du broker
+PASSWORD=""         # Blank password for broker authentication / Mot de passe vierge pour l'authentification du broker
+
+
