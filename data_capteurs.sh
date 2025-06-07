@@ -4,9 +4,9 @@
 # Your MQTT topics, one for each room's sensor data.
 MQTT_TOPICS=(
     "AM107/by-room/B106/data"
-    "AM107/by-room/B110/data"
-    "AM107/by-room/E003/data"
-    "AM107/by-room/E104/data"
+    "AM107/by-room/B101/data"
+    "AM107/by-room/E105/data"
+    "AM107/by-room/E100 /data"
 )
 
 # MQTT Broker connection details
