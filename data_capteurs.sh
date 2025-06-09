@@ -1,77 +1,54 @@
 #!/bin/bash
 
 # --- Configuration ---
-# Your MQTT topics, one for each room's sensor data.
 MQTT_TOPICS=(
     "AM107/by-room/B106/data"
     "AM107/by-room/B101/data"
     "AM107/by-room/E105/data"
-    "AM107/by-room/E100 /data"
+    "AM107/by-room/E100/data"
 )
 
-# MQTT Broker connection details
 MQTT_BROKER="mqtt.iut-blagnac.fr"
 MQTT_PORT="1883"
 
-# MySQL Database connection details
 DB_USER="root"
 DB_PASS="passroot"
 DB_NAME="SAe23"
 
-# Path to MySQL client
 MYSQL_CLIENT="/opt/lampp/bin/mysql"
 
-# --- Main Script ---
+# --- Start ---
+echo "Starting MQTT subscription for sensor data collection..."
+echo "Connecting to $MQTT_BROKER:$MQTT_PORT"
 
-echo "Début de la phase d'abonnement MQTT pour la récupération des données des capteurs ..."
-echo "Connection à $MQTT_BROKER:$MQTT_PORT"
-
-# Loop through each topic and start a background process for subscription.
-# Each process will read messages and pipe them to the processing function.
 for TOPIC in "${MQTT_TOPICS[@]}"; do
     mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$TOPIC" | while read -r PAYLOAD; do
-        # Extract data using jq
-        # Note: jq outputs numbers as numbers and strings as strings.
-        # The 'Mesure.valeur' column in your database schema is INT(11).
-        # If the sensor data (temperature, humidity, co2) can be floating-point numbers,
-        # they will be truncated during insertion or cause errors.
-        # Consider changing 'valeur' to FLOAT or DECIMAL in your 'Mesure' table
-        # if non-integer values are expected.
+
         TEMP=$(echo "$PAYLOAD" | jq '.[0].temperature')
         ILLU=$(echo "$PAYLOAD" | jq '.[0].illumination')
         CO2=$(echo "$PAYLOAD" | jq '.[0].co2')
-        ROOM=$(echo "$PAYLOAD" | jq -r '.[1].room') # -r for raw string output
+        ROOM=$(echo "$PAYLOAD" | jq -r '.[1].room')
 
-        DATETIME=$(date "+%Y-%m-%d %H:%M:%S")
+        DATE=$(date "+%Y-%m-%d")
+        TIME=$(date "+%H:%M:%S")
 
-        # Define sensor types and their units for easy iteration
         declare -A SENSORS=(
             ["temperature"]="$TEMP"
             ["illumination"]="$ILLU"
             ["co2"]="$CO2"
         )
         declare -A UNITS=(
-            ["temperature"]="°C"
+            ["temperature"]="C"
             ["illumination"]="lux"
             ["co2"]="ppm"
         )
 
-        echo "Message recu pour la salle '$ROOM' à $DATETIME"
+        echo "Message received for room '$ROOM' at $DATE $TIME"
 
-        # --- Database Insertion Pre-checks (salle) ---
-        # The 'capteurs' table has a foreign key 'nom_salle' referencing 'salles.nom_salle'.
-        # To ensure referential integrity, we must confirm the 'salles' entry exists first.
-        # The 'salles' table requires 'capacite', 'type', and 'id_batiment'.
-        # As these values are NOT provided by the MQTT payload, we use placeholder values.
-        # It is highly recommended that you either:
-        # 1. Pre-populate your 'Salle' table with accurate data.
-        # 2. Modify your 'Salle' table to allow NULLs or define default values for these columns.
-        # 3. Enhance your MQTT payload to include this information.
-        SALLE_CAPACITE=0       # Placeholder: Default capacity
-        SALLE_TYPE="Undefined" # Placeholder: Default room type
-        SALLE_ID_BATIMENT=1    # Placeholder: Assuming Batiment ID 1 exists.
-                               # Ensure a 'Batiment' with this ID is present,
-                               # or adjust to an appropriate existing ID.
+        # Placeholder values (should be pre-filled in production)
+        SALLE_CAPACITE=0
+        SALLE_TYPE="Undefined"
+        SALLE_ID_BATIMENT=1
 
         if [[ -n "$ROOM" && "$ROOM" != "null" ]]; then
             "$MYSQL_CLIENT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
@@ -79,58 +56,49 @@ for TOPIC in "${MQTT_TOPICS[@]}"; do
                 VALUES ('$ROOM', '$SALLE_TYPE', $SALLE_CAPACITE, $SALLE_ID_BATIMENT);
             "
             if [ $? -eq 0 ]; then
-                echo "  Salle '$ROOM' handled (inserted if new, with placeholder data)."
+                echo "  Room '$ROOM' processed (inserted if new, with default data)."
             else
-                echo "  Error handling Salle '$ROOM'. Check if foreign key constraint for 'id_batiment' is met (i.e., Batiment ID 1 and 2 exists)."
+                echo "  Error processing room '$ROOM'. Check if building ID $SALLE_ID_BATIMENT exists."
             fi
         else
-            echo "  Warning: Room name is missing or null in payload. Cannot process sensor data for this entry."
-            continue # Skip to the next payload if room name is invalid
+            echo "  Warning: Room name is missing or null. Skipping entry."
+            continue
         fi
 
-
-        # Process each sensor data point (temperature, humidity, co2)
         for TYPE in "${!SENSORS[@]}"; do
-            SENSOR_NAME="${TYPE}_${ROOM}" # e.g., 'temperature_B106'
+            SENSOR_NAME="${TYPE}_${ROOM}"
             VALUE="${SENSORS[$TYPE]}"
             UNIT="${UNITS[$TYPE]}"
 
-            # Skip if value is empty or "null" (as returned by jq for missing fields)
             if [[ -z "$VALUE" || "$VALUE" == "null" ]]; then
-                echo "  Warning: '$TYPE' value for room '$ROOM' is missing or null. Skipping this sensor reading."
+                echo "  Warning: '$TYPE' value for room '$ROOM' is missing. Skipping."
                 continue
             fi
 
-            # --- Database Insertion (Capteur) ---
-            # 1. Insert/Update Capteur (sensor definition)
-            #    'INSERT IGNORE' prevents errors if the sensor already exists,
-            #    making the script idempotent for sensor definitions.
             "$MYSQL_CLIENT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-                INSERT IGNORE INTO Capteur (nom_capteur, type_capteur, unite, nom_salle)
+                INSERT IGNORE INTO capteurs (nom_capteur, type_capteur, unite, nom_salle)
                 VALUES ('$SENSOR_NAME', '$TYPE', '$UNIT', '$ROOM');
             "
             if [ $? -eq 0 ]; then
-                echo "  Capteur '$SENSOR_NAME' (Type: $TYPE, Room: $ROOM) handled."
+                echo "  Sensor '$SENSOR_NAME' (Type: $TYPE, Room: $ROOM) processed."
             else
-                echo "  Error handling Capteur '$SENSOR_NAME'. Make sure 'nom_salle' foreign key is valid."
+                echo "  Error inserting sensor '$SENSOR_NAME'. Check 'nom_salle' foreign key."
             fi
 
-            # --- Database Insertion (Mesure) ---
-            # 2. Insert Mesure (actual sensor reading)
-            #    The 'id_mesure' column is an auto-incrementing primary key, so we don't insert it.
+            # Insert the measurement into the database
             "$MYSQL_CLIENT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-                INSERT INTO Mesure (nom_capteur, valeur, date_heure)
-                VALUES ('$SENSOR_NAME', '$VALUE', '$DATETIME');
+                INSERT INTO mesures (nom_capteur, valeur, date, horaire)
+                VALUES ('$SENSOR_NAME', '$VALUE', '$DATE', '$TIME');
             "
             if [ $? -eq 0 ]; then
-                echo "  Mesure inserted for '$SENSOR_NAME': Value $VALUE at $DATETIME."
+                echo "  Measurement inserted for '$SENSOR_NAME': Value $VALUE at $DATE $TIME."
             else
-                echo "  Error inserting Mesure for '$SENSOR_NAME'. Check 'valeur' data type (INT) compatibility."
+                echo "  Error inserting measurement for '$SENSOR_NAME'."
             fi
         done
-        echo "---" # Separator for readability between different payload processing
-    done & # Run this mosquitto_sub and its processing in the background
+        echo "---"
+    done &
 done
 
 echo "All MQTT subscriptions are active. Press Ctrl+C to stop the script."
-wait # Keep the main script running to allow background jobs to continue
+wait
