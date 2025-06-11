@@ -29,6 +29,12 @@ for TOPIC in "${MQTT_TOPICS[@]}"; do
         CO2=$(echo "$PAYLOAD" | jq '.[0].co2')
         ROOM=$(echo "$PAYLOAD" | jq -r '.[1].room')
 
+
+	echo "DEBUG Payload: $PAYLOAD"
+	echo "Parsed room: $ROOM"
+	echo "Temp: $TEMP | Illu: $ILLU | CO2: $CO2"
+
+
         DATE=$(date "+%Y-%m-%d")
         TIME=$(date "+%H:%M:%S")
 
@@ -52,7 +58,7 @@ for TOPIC in "${MQTT_TOPICS[@]}"; do
 
         if [[ -n "$ROOM" && "$ROOM" != "null" ]]; then
             "$MYSQL_CLIENT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-                INSERT IGNORE INTO salles (nom_salle, capacite, type, id_batiment)
+                INSERT IGNORE INTO salles (nom_salle, type, capacite, id_batiment)
                 VALUES ('$ROOM', '$SALLE_TYPE', $SALLE_CAPACITE, $SALLE_ID_BATIMENT);
             "
             if [ $? -eq 0 ]; then
@@ -76,7 +82,7 @@ for TOPIC in "${MQTT_TOPICS[@]}"; do
             fi
 
             "$MYSQL_CLIENT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "
-                INSERT IGNORE INTO capteurs (nom_capteur, type_capteur, unite, nom_salle)
+                INSERT IGNORE INTO capteurs (nom_capteur, type, unite, nom_salle)
                 VALUES ('$SENSOR_NAME', '$TYPE', '$UNIT', '$ROOM');
             "
             if [ $? -eq 0 ]; then
