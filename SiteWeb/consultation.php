@@ -15,6 +15,7 @@ $sql = "
         M.nom_capteur,
         M.valeur,
         M.date,
+        M.horaire,
         C.type,
         C.unite,
         S.nom_salle,
@@ -91,14 +92,13 @@ mysqli_close($conn); // Close the database connection.
                     <tbody>
                         <?php foreach ($derniere_mesures as $mesure): // Loop through each sensor measurement. ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($mesure['nom_batiment']); ?></td>
+                                <td><?php echo htmlspecialchars($mesure['nom']); ?></td>
                                 <td><?php echo htmlspecialchars($mesure['nom_salle']); ?></td>
                                 <td><?php echo htmlspecialchars($mesure['nom_capteur']); ?></td>
                                 <td><?php echo htmlspecialchars($mesure['type']); ?></td>
                                 <td><?php echo htmlspecialchars($mesure['valeur']); ?></td>
                                 <td><?php echo htmlspecialchars($mesure['unite']); ?></td>
-                                <td><?php echo htmlspecialchars($mesure['date']); ?></td>
-                                <td><?php echo htmlspecialchars($mesure['horaire']); ?></td>
+                                <td><?php echo htmlspecialchars($mesure['date'] . ' ' . $mesure['horaire']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

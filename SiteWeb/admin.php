@@ -117,7 +117,6 @@ mysqli_close($conn); // Close the database connection.
                 <li><a href="index.php">Accueil</a></li>
                 <li><a href="consultation.php">Consultation</a></li>
                 <li><a href="admin.php" class="active">Administration</a></li>
-                <li><a href="gestion.php">Gestion</a></li>
                 <li><a href="deconnexion.php">Déconnexion</a></li>
                 <li><a href="gestion_projet.php">Gestion Projet</a></li>
             </ul>

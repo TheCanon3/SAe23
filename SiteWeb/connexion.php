@@ -31,7 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     } else {
         // If no administrator is found, attempt to log in as a Manager (Gestionnaire).
-        $stmt_gest = mysqli_prepare($conn, "SELECT id_batiment, NomGest, MdpGest FROM Batiment WHERE NomGest = ?");
+        $stmt_gest = mysqli_prepare($conn, "SELECT id_batiment, login_gestionnaire, pswd_gestionnaire FROM batiments WHERE login_gestionnaire = ?");
         mysqli_stmt_bind_param($stmt_gest, "s", $identifiant);
         mysqli_stmt_execute($stmt_gest);
         $result_gest = mysqli_stmt_get_result($stmt_gest);
@@ -39,9 +39,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // If a manager is found.
         if (mysqli_num_rows($result_gest) == 1) {
             $gestionnaire = mysqli_fetch_assoc($result_gest); // Fetch manager's data.
-            if ($mot_de_passe === $gestionnaire['MdpGest']) {
+            if ($mot_de_passe === $gestionnaire['pswd_gestionnaire']) {
                 $_SESSION['user_id'] = $gestionnaire['id_batiment']; // Store building ID in session.
-                $_SESSION['username'] = $gestionnaire['NomGest']; // Store manager's username.
+                $_SESSION['username'] = $gestionnaire['login_gestionnaire']; // Store manager's username.
                 $_SESSION['role'] = 'Gestionnaire'; // Set user role.
                 header("Location: gestion.php"); // Redirect to the manager page.
                 exit();
